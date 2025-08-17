@@ -1,20 +1,19 @@
-import React from "react";
-import { Issue, categoryIcons, statusColors } from "@/data/mockData";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Clock, MapPin } from "lucide-react";
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Card } from './Card';
+import { Badge } from './Badge';
+import { Issue, categoryIcons } from '../types';
+import { theme } from '../styles/theme';
 
 interface IssueCardProps {
   issue: Issue;
-  onClick?: () => void;
+  onPress?: () => void;
   showProgress?: boolean;
 }
 
 export const IssueCard: React.FC<IssueCardProps> = ({ 
   issue, 
-  onClick,
+  onPress,
   showProgress = true 
 }) => {
   const formatTime = (dateString: string) => {
@@ -27,65 +26,182 @@ export const IssueCard: React.FC<IssueCardProps> = ({
     return date.toLocaleDateString();
   };
 
-  return (
-    <Card 
-      className={`cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${
-        issue.isUrgent ? 'border-urgent shadow-urgent animate-fade-in' : 'shadow-card'
-      }`}
-      onClick={onClick}
-    >
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-2xl">{categoryIcons[issue.category]}</span>
-            <div>
-              <CardTitle className={`text-lg ${issue.isUrgent ? 'text-urgent' : ''}`}>
-                {issue.title}
-              </CardTitle>
-              <div className="flex items-center gap-2 mt-1">
-                <MapPin className="h-3 w-3 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">{issue.location}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex flex-col items-end gap-2">
-            <Button 
-              variant="status" 
-              size="sm"
-              className={`border-${statusColors[issue.status]} text-${statusColors[issue.status]}`}
-            >
-              {issue.status}
-            </Button>
-            {issue.isUrgent && (
-              <Badge variant="destructive" className="bg-urgent">
-                Urgent
-              </Badge>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-      
-      <CardContent>
-        <p className="text-sm text-muted-foreground mb-4">{issue.description}</p>
-        
-        {showProgress && (
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">Progress</span>
-              <span className="text-sm text-muted-foreground">{issue.progress}%</span>
-            </div>
-            <Progress 
-              value={issue.progress} 
-              className="h-2"
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'Reported': return 'default';
+      case 'In Progress': return 'warning';
+      case 'Resolved': return 'success';
+      default: return 'default';
+    }
+  };
+
+  const formatLocation = (location: string, coordinates?: { latitude: number; longitude: number }) => {
+    // If we have a readable location, use it
+    if (location && !location.includes(',') && !location.match(/^-?\d+\.\d+/)) {
+      return location;
+    }
+    
+    // If coordinates exist, format them nicely
+    if (coordinates) {
+      return `${coordinates.latitude.toFixed(4)}, ${coordinates.longitude.toFixed(4)}`;
+    }
+    
+    // Fallback to original location
+    return location;
+  };
+
+  const CardContent = (
+    <Card style={[styles.card, issue.isUrgent && styles.urgentCard]}>
+      <View style={styles.header}>
+        <View style={styles.titleRow}>
+          <Text style={styles.categoryIcon}>{categoryIcons[issue.category]}</Text>
+          <View style={styles.titleContainer}>
+            <Text style={[styles.title, issue.isUrgent && styles.urgentTitle]}>
+              {issue.title}
+            </Text>
+            <Text style={styles.location}>
+              📍 {formatLocation(issue.location, issue.coordinates)}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.badges}>
+          <Badge text={issue.status} variant={getStatusVariant(issue.status)} size="sm" />
+          {issue.isUrgent && (
+            <Badge text="Urgent" variant="urgent" size="sm" />
+          )}
+        </View>
+      </View>
+
+      <Text style={styles.description} numberOfLines={2}>
+        {issue.description}
+      </Text>
+
+      {showProgress && (
+        <View style={styles.progressContainer}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressLabel}>Progress</Text>
+            <Text style={styles.progressPercent}>{issue.progress}%</Text>
+          </View>
+          <View style={styles.progressBar}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { width: `${issue.progress}%` },
+                issue.progress === 100 && styles.progressComplete
+              ]} 
             />
-          </div>
-        )}
-        
-        <div className="flex items-center gap-2 mt-4 text-xs text-muted-foreground">
-          <Clock className="h-3 w-3" />
-          <span>Reported {formatDate(issue.reportedAt)} at {formatTime(issue.reportedAt)}</span>
-        </div>
-      </CardContent>
+          </View>
+        </View>
+      )}
+
+      <View style={styles.footer}>
+        <Text style={styles.timestamp}>
+          🕒 Reported {formatDate(issue.reportedAt)} at {formatTime(issue.reportedAt)}
+        </Text>
+      </View>
     </Card>
   );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.8}>
+        {CardContent}
+      </TouchableOpacity>
+    );
+  }
+
+  return CardContent;
 };
+
+const styles = StyleSheet.create({
+  card: {
+    marginVertical: theme.spacing.xs,
+  },
+  urgentCard: {
+    borderLeftWidth: 4,
+    borderLeftColor: theme.colors.urgent,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: theme.spacing.sm,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+    marginRight: theme.spacing.sm,
+  },
+  categoryIcon: {
+    fontSize: theme.fontSize.xl,
+    marginRight: theme.spacing.sm,
+  },
+  titleContainer: {
+    flex: 1,
+  },
+  title: {
+    fontSize: theme.fontSize.lg,
+    fontWeight: theme.fontWeight.semibold,
+    color: theme.colors.gray900,
+    marginBottom: theme.spacing.xs / 2,
+  },
+  urgentTitle: {
+    color: theme.colors.urgent,
+  },
+  location: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray600,
+  },
+  badges: {
+    alignItems: 'flex-end',
+    gap: theme.spacing.xs / 2,
+  },
+  description: {
+    fontSize: theme.fontSize.md,
+    color: theme.colors.gray700,
+    lineHeight: 20,
+    marginBottom: theme.spacing.md,
+  },
+  progressContainer: {
+    marginBottom: theme.spacing.md,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: theme.spacing.xs,
+  },
+  progressLabel: {
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
+    color: theme.colors.gray700,
+  },
+  progressPercent: {
+    fontSize: theme.fontSize.sm,
+    color: theme.colors.gray600,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: theme.colors.gray200,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: theme.colors.primary,
+    borderRadius: 3,
+  },
+  progressComplete: {
+    backgroundColor: theme.colors.success,
+  },
+  footer: {
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.gray100,
+    paddingTop: theme.spacing.sm,
+  },
+  timestamp: {
+    fontSize: theme.fontSize.xs,
+    color: theme.colors.gray500,
+  },
+});
